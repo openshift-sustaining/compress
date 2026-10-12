@@ -233,6 +233,25 @@ func TestDecompress4X(t *testing.T) {
 	}
 }
 
+// TestReadTableWeightsTableLog checks that FSE compressed weights are limited
+// to tableLog 6, as in the reference decoder. Both tables decode to weights
+// 1, 1; encoders never pick more than tableLog 5 for weights.
+func TestReadTableWeightsTableLog(t *testing.T) {
+	tests := []struct {
+		tableLog int
+		in       []byte
+	}{
+		{tableLog: 6, in: []byte{4, 0x11, 0xfe, 0xcb, 0x12}},
+		{tableLog: 7, in: []byte{5, 0x12, 0xfc, 0x03, 0x81, 0x40}},
+	}
+	for _, tt := range tests {
+		_, _, err := ReadTable(tt.in, nil)
+		if (err != nil) != (tt.tableLog > 6) {
+			t.Errorf("tableLog %d: got error %v", tt.tableLog, err)
+		}
+	}
+}
+
 func TestRoundtrip1XFuzz(t *testing.T) {
 	for _, test := range testfilesExtended {
 		t.Run(test.name, func(t *testing.T) {
