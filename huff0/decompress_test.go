@@ -125,7 +125,10 @@ func TestDecompress1XRegression(t *testing.T) {
 		t.Run(tt.Name, func(t *testing.T) {
 			s, rem, err := ReadTable(data, nil)
 			if err != nil {
-				t.Fatal(err)
+				// The table may be rejected outright, as for oversized weights tableLog.
+				// Either way the input must not decode.
+				t.Logf("ReadTable returned error: %s", err)
+				return
 			}
 			_, err = s.Decompress1X(rem)
 			if err == nil {
@@ -230,6 +233,25 @@ func TestDecompress4X(t *testing.T) {
 				})
 			}
 		})
+	}
+}
+
+// TestReadTableWeightsTableLog checks that FSE compressed weights are limited
+// to tableLog 6, as in the reference decoder. Both tables decode to weights
+// 1, 1; encoders never pick more than tableLog 5 for weights.
+func TestReadTableWeightsTableLog(t *testing.T) {
+	tests := []struct {
+		tableLog int
+		in       []byte
+	}{
+		{tableLog: 6, in: []byte{4, 0x11, 0xfe, 0xcb, 0x12}},
+		{tableLog: 7, in: []byte{5, 0x12, 0xfc, 0x03, 0x81, 0x40}},
+	}
+	for _, tt := range tests {
+		_, _, err := ReadTable(tt.in, nil)
+		if (err != nil) != (tt.tableLog > 6) {
+			t.Errorf("tableLog %d: got error %v", tt.tableLog, err)
+		}
 	}
 }
 
